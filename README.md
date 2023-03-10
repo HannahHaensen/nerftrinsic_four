@@ -15,10 +15,7 @@ torchvision==0.14.1+cu117
 - install requirements.txt
 ## Data
 - Download datasets
-   - LLFF 
-   - BLEFF
-   - iFF at ANONYMIZED
-   - put them in the folder data/
+   - unzip the example data in data/
 # Train
   we provide two examples on from LLFF, the fern scene the other one from our own dataset iFF, the T1 scene
 ### LLFF
