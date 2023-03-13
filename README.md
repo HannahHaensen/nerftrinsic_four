@@ -31,4 +31,6 @@ Dataset can be found at ANONYMIZED.
 
 # Acknowledgment
 
-If you cite our work, make also sure to take a look at NeRF--, as the general joint optimization idea for intrinsic and extrinsic camera parameters was presented there.
+If you cite our work, make also sure to take a look at NeRF--, as the initial general joint optimization idea for intrinsic and extrinsic camera parameters was presented there.
+
+Nevertheless, **we contribute** a joint optimization of **differing** intrinsic camera parameters and use **Gaussian Fourier** features for our extrinsic camera parameter prediction.
