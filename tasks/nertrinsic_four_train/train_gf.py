@@ -26,7 +26,7 @@ from models.poses import LearnPoseGF
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--epoch', default=500, type=int)
+    parser.add_argument('--epoch', default=1000, type=int)
     parser.add_argument('--eval_interval', default=100, type=int, help='run eval every this epoch number')
 
     parser.add_argument('--gpu_id', default=0, type=int)
