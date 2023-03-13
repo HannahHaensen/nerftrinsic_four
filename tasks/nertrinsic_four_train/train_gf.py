@@ -353,14 +353,28 @@ def main(args):
             with torch.no_grad():
                 eval_one_epoch(eval_c2ws, scene_train, model, focal_net, pose_param_net, my_devices, args, epoch_i, writer, rgb_act_fn)
 
-                fxfy = focal_net(0)
-                tqdm.write('Est fx: {0:.2f}, fy {1:.2f}'.format(fxfy[0].item(), fxfy[1].item()))
-                logger.info('Est fx: {0:.2f}, fy {1:.2f}'.format(fxfy[0].item(), fxfy[1].item()))
-
                 # save the latest model
                 save_checkpoint(epoch_i, model, optimizer_nerf, experiment_dir, ckpt_name='latest_nerf')
                 save_checkpoint(epoch_i, focal_net, optimizer_focal, experiment_dir, ckpt_name='latest_focal')
                 save_checkpoint(epoch_i, pose_param_net, optimizer_pose, experiment_dir, ckpt_name='latest_pose')
+
+            print('N_imgs', scene_train.N_imgs)
+            for idx in range(scene_train.N_imgs):
+                # print(idx)
+                img = scene_train.imgs[idx].to(my_devices)  # (H, W, 3)
+                H, W = img.shape[0], img.shape[1]
+                focal_idx = scene_train.HWFocal[str(H) + str(W)][1]
+                fxfy = focal_net(focal_idx, H, W)
+                if idx % 10 == 0:
+                    tqdm.write(
+                        'Est fx: {0:.2f}, fy {1:.2f}, COLMAP focal: {2:.2f}'.format(fxfy[0].item(), fxfy[1].item(),
+                                                                                    scene_train.HWFocal[
+                                                                                        str(H) + str(W)][0]))
+                    logger.info(
+                        'Est fx: {0:.2f}, fy {1:.2f}, COLMAP focal: {2:.2f}'.format(fxfy[0].item(), fxfy[1].item(),
+                                                                                    scene_train.HWFocal[
+                                                                                        str(H) + str(W)][0]))
+
     return
 
 

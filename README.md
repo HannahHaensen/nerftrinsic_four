@@ -16,6 +16,7 @@ torchvision==0.14.1+cu117
 ## Data
 - Download datasets
    - unzip the example data in data/
+   - note! we only have poses_bounds for reference
 # Train
   we provide two examples on from LLFF, the fern scene the other one from our own dataset iFF, the T1 scene
 ### LLFF
