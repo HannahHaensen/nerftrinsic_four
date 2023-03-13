@@ -19,10 +19,11 @@ torchvision==0.14.1+cu117
    - note! we only have poses_bounds for reference
 # Train
   we provide two examples on from LLFF, the fern scene the other one from our own dataset iFF, the T1 scene
-### LLFF
-``python tasks/nertrinsic_four_train/train_gf.py --base_dir data/LLFF --scene_name fern``
+
 ### iFF
 ``python tasks/nertrinsic_four_train/train_gf.py --base_dir data/iFF --scene_name T1``
+### LLFF
+``python tasks/nertrinsic_four_train/train_gf.py --base_dir data/LLFF --scene_name fern``
 
 # Dataset
 
