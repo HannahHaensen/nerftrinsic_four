@@ -161,7 +161,7 @@ def eval_one_epoch(eval_c2ws, scene_train, model, focal_net, pose_param_net,
         H, W = img.shape[0], img.shape[1]
         focal_idx = scene_train.HWFocal[str(H) + str(W)][1]
         fxfy = focal_net(focal_idx, H, W)
-        ray_dir_cam = comp_ray_dir_cam_fxfy(scene_train.H, scene_train.W, fxfy[0], fxfy[1])
+        ray_dir_cam = comp_ray_dir_cam_fxfy(H, W, fxfy[0], fxfy[1])
 
         c2w = eval_c2ws[i].to(my_devices)  # (4, 4)
 
