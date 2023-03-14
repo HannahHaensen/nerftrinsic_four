@@ -4,3 +4,5 @@ logs/*
 **/__pycache__/**
 data/iFF/**
 data/LLFF/**
+
+data/**
