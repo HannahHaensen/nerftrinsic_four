@@ -15,7 +15,11 @@ torchvision==0.14.1+cu117
 - install requirements.txt
 ## Data
 - Download datasets
-   - unzip the example data in data/
+   - unzip the example data.zip
+   - make sure you have the structure
+       - data/
+            - iFF/T1
+            - LLFF/fern
    - **note! we only have poses_bounds for reference**
 # Train
   we provide two examples on from LLFF, the fern scene the other one from our own dataset iFF, the T1 scene
