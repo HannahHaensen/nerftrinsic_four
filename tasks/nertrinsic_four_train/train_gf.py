@@ -41,7 +41,7 @@ def parse_args():
 
     parser.add_argument('--learn_focal', default=True, type=bool)
     parser.add_argument('--focal_order', default=2, type=int)
-    parser.add_argument('--fx_only', default=False, type=eval, choices=[True, False])
+    parser.add_argument('--fx_only', default=True, type=eval, choices=[True, False])
     parser.add_argument('--focal_lr', default=0.001, type=float)
     parser.add_argument('--focal_milestones', default=list(range(0, 10000, 100)), type=int, nargs='+',
                         help='learning rate schedule milestones')
@@ -159,7 +159,7 @@ def eval_one_epoch(eval_c2ws, scene_train, model, focal_net, pose_param_net,
         img = scene_train.imgs[i].to(my_devices)  # (H, W, 3)
         # get focal
         H, W = img.shape[0], img.shape[1]
-        focal_idx = scene_train.HWFocal[str(H) + str(W)][1]
+        focal_idx = scene_train.HWFocal[str(H) + str(W)][0]
         fxfy = focal_net(focal_idx, H, W)
         ray_dir_cam = comp_ray_dir_cam_fxfy(H, W, fxfy[0], fxfy[1])
 
@@ -214,7 +214,7 @@ def train_one_epoch(scene_train, optimizer_nerf, optimizer_focal, optimizer_pose
         img = scene_train.imgs[i].to(my_devices)  # (H, W, 3)
         # get focal
         H, W = img.shape[0], img.shape[1]
-        focal_idx = scene_train.HWFocal[str(H) + str(W)][1]
+        focal_idx = scene_train.HWFocal[str(H) + str(W)][0]
         fxfy = focal_net(focal_idx, H, W)
         #
         ray_dir_cam = comp_ray_dir_cam_fxfy(H, W, fxfy[0], fxfy[1])
@@ -304,7 +304,7 @@ def main(args):
         model = model.to(device=my_devices)
 
     # learn focal parameter
-    print("LearnFocalCamDependent init", len(scene_train.focal), len(scene_train.HWFocal))
+    print("LearnFocalCamDependent init", len(scene_train.HWFocal))
     focal_net = LearnFocalCamDependent(num_cams=len(scene_train.HWFocal), req_grad=args.learn_focal,
                                        fx_only=args.fx_only, order=args.focal_order)
     if args.multi_gpu:
@@ -363,16 +363,17 @@ def main(args):
                 # print(idx)
                 img = scene_train.imgs[idx].to(my_devices)  # (H, W, 3)
                 H, W = img.shape[0], img.shape[1]
-                focal_idx = scene_train.HWFocal[str(H) + str(W)][1]
+                # print(scene_train.HWFocalGT)
+                focal_idx = scene_train.HWFocalGT[str(H) + str(W)][1]
                 fxfy = focal_net(focal_idx, H, W)
                 if idx % 10 == 0:
                     tqdm.write(
                         'Est fx: {0:.2f}, fy {1:.2f}, COLMAP focal: {2:.2f}'.format(fxfy[0].item(), fxfy[1].item(),
-                                                                                    scene_train.HWFocal[
+                                                                                    scene_train.HWFocalGT[
                                                                                         str(H) + str(W)][0]))
                     logger.info(
                         'Est fx: {0:.2f}, fy {1:.2f}, COLMAP focal: {2:.2f}'.format(fxfy[0].item(), fxfy[1].item(),
-                                                                                    scene_train.HWFocal[
+                                                                                    scene_train.HWFocalGT[
                                                                                         str(H) + str(W)][0]))
 
     return
