@@ -31,7 +31,7 @@ torchvision==0.14.1+cu117
 
 # Dataset
 
-Dataset can be found at ANONYMIZED.
+Dataset available soon.
 
 # Acknowledgment
 
