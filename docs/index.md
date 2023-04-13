@@ -37,5 +37,18 @@ Our NeRFtrinsic Four can handle divers camera intrinsics which leads to a better
 
 ![image](https://user-images.githubusercontent.com/22636930/231706690-bfa8a920-4800-48aa-9104-6dc0c33d4c4b.png)
 
+# Citation
 
+You do something similar? or use parts from our code here you can cite our paper:
+
+```
+@misc{schieber2023nerftrinsic,
+      title={NeRFtrinsic Four: An End-To-End Trainable NeRF Jointly Optimizing Diverse Intrinsic and Extrinsic Camera Parameters}, 
+      author={Hannah Schieber and Fabian Deuser and Bernhard Egger and Norbert Oswald and Daniel Roth},
+      year={2023},
+      eprint={2303.09412},
+      archivePrefix={arXiv},
+      primaryClass={cs.CV}
+}
+```
 
