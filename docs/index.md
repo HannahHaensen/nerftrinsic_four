@@ -9,7 +9,9 @@
 
 contact e-mail: hannah.schieber[at]fau.de
 
-## [Paper](https://arxiv.org/pdf/2303.09412.pdf) [iFF](https://drive.google.com/file/d/1deYczPDEcsInCD4MkSKeH_ZMbq_TGGi4/view)
+# Overview
+
+**[Paper](https://arxiv.org/pdf/2303.09412.pdf) [iFF](https://drive.google.com/file/d/1deYczPDEcsInCD4MkSKeH_ZMbq_TGGi4/view)**
 
 # Visual improvements
 
