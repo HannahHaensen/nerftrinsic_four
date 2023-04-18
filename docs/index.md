@@ -9,6 +9,8 @@
 
 contact e-mail: hannah.schieber[at]fau.de
 
+## [Paper](https://arxiv.org/pdf/2303.09412.pdf) [iFF](https://drive.google.com/file/d/1deYczPDEcsInCD4MkSKeH_ZMbq_TGGi4/view)
+
 # Visual improvements
 
 Our NeRFtrinsic Four can handle divers camera intrinsics which leads to a better result.
@@ -31,6 +33,8 @@ Our NeRFtrinsic Four can handle divers camera intrinsics which leads to a better
 ## iFF
 
 ![image](https://user-images.githubusercontent.com/22636930/231706040-cb0ef15e-f923-419c-a71c-4d910c5220b4.png)  
+
+You want to work with varying intrinsics as well, check out [iFF](https://drive.google.com/file/d/1deYczPDEcsInCD4MkSKeH_ZMbq_TGGi4/view).
 
 
 ### iFF Example Images
