@@ -37,7 +37,7 @@ torchvision==0.14.1+cu117
 
 # Dataset
 
-Dataset available soon.
+Can be downloaded at [iFF Google Drive](https://drive.google.com/file/d/1deYczPDEcsInCD4MkSKeH_ZMbq_TGGi4/view)
 
 # Acknowledgment
 
