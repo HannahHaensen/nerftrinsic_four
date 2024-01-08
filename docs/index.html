@@ -1,0 +1,171 @@
+<!DOCTYPE HTML>
+<html lang="en">
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+
+    <title>Hannah Schieber</title>
+
+    <meta name="author" content="Hannah Schieber">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="shortcut icon" href="images/favicon/favicon.ico" type="image/x-icon">
+    <link rel="stylesheet" type="text/css" href="stylesheet.css">
+    <meta content="NeRFtrinsic Four: An End-To-End Trainable NeRF Jointly Optimizing Diverse Intrinsic and Extrinsic Camera Parameters"
+          property="og:title">
+    <meta content="NeRFtrinsic Four: An End-To-End Trainable NeRF Jointly Optimizing Diverse Intrinsic and Extrinsic Camera Parameters"
+          property="description">
+    <meta content="different intrinsic and extrinsic camera parameters" property="description">
+    <meta content="nerf camera parameters" property="description">
+
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.0.0/dist/css/bootstrap.min.css"
+          integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm" crossorigin="anonymous">
+
+
+</head>
+
+<body>
+<div class="container">
+    <br>
+    <br>
+    <h1 style="align-content: center; text-align: center">NeRFtrinsic Four: An End-To-End Trainable NeRF Jointly
+        Optimizing Diverse Intrinsic and Extrinsic Camera Parameters</h1>
+    <h5></h5>
+
+    <div class="row" style="align-content: center; text-align: center">
+        <img src="https://github.com/HannahHaensen/nerftrinsic_four/blob/main/figures/teaser.png"
+             style="width: 100%">
+    </div>
+    <br>
+    <div class="row" style="align-content: center; text-align: center">
+        <div class="col-md-12">
+            <b><a href="">Hannah Schieber
+            <sup>1,4</sup></a>, Fabian Deuser
+            <sup>2</sup>, Bernhard Egger
+            <sup>3</sup>, Norbert Oswald
+            <sup>2</sup>, and Daniel Roth<spu>4</spu></b>
+        </div>
+    </div>
+    <br>
+    <div class="row" style="align-content: center; text-align: center">
+        <div class="col-md-3 col-sm-6">
+            Human-Centered Computing and Extended Reality, Friedrich-Alexander University (FAU) Erlangen-Nurnberg,
+            Erlangen, Germany
+            <sup>1</sup>
+        </div>
+        <div class="col-md-3 col-sm-6">
+            Institute for Distributed Intelligent Systems University of the Bundeswehr Munich Munich, Germany
+            <sup>2</sup>
+        </div>
+        <div class="col-md-3 col-sm-6">
+            Lehrstuhl fur Graphische Datenverarbeitung (LGDV) Friedrich-Alexander Universität (FAU)
+            Erlangen-Nürnberg Erlangen, Germany
+            <sup>3</sup>
+        </div>
+        <div class="col-md-3 col-sm-6">
+            Lehrstuhl fur Graphische Datenverarbeitung (LGDV) Friedrich-Alexander Universität (FAU)
+            Erlangen-Nürnberg Erlangen, Germany
+            <sup>4</sup>
+        </div>
+    </div>
+    <br>
+    <div class="row" style="align-content: center; text-align: center">
+
+        <div class="col-md-4">
+            <a href="https://arxiv.org/pdf/2303.09412.pdf">
+                <img src="https://github.com/HannahHaensen/nerftrinsic_four/blob/main/figures/paper.png"
+                     style="width: 150px; border: 1px black solid"></a>
+            <p>arixv</p>
+        </div>
+        <div class="col-md-4">
+            <a href="https://github.com/HannahHaensen/nerftrinsic_four">
+                <img src="https://github.com/HannahHaensen/nerftrinsic_four/blob/main/figures/code.png"
+                     style="width: 150px; border: 1px black solid"></a>
+            <p>Code</p>
+        </div>
+        <div class="col-md-4">
+            <a href="https://drive.google.com/file/d/1deYczPDEcsInCD4MkSKeH_ZMbq_TGGi4/view">
+                <img src="https://github.com/HannahHaensen/nerftrinsic_four/blob/main/figures/0000.png"
+                     style="width: 150px; border: 1px black solid"></a>
+            <p>Dataset</p>
+        </div>
+    </div>
+    <br>
+    <div class="row">
+        <h3>Abstract</h3>
+        <div class="col-md-12">
+            Novel view synthesis using neural radiance fields (NeRF) is the state-of-the-art technique for generating
+            high-quality images from novel viewpoints. Existing methods require a priori knowledge about extrinsic and
+            intrinsic camera parameters. This limits their applicability to synthetic scenes, or real-world scenarios
+            with the necessity of a preprocessing step. Current research on the joint optimization of camera parameters
+            and NeRF focuses on refining noisy extrinsic camera parameters and often relies on the preprocessing of
+            intrinsic camera parameters. Further approaches are limited to cover only one single camera intrinsic. To
+            address these limitations, we propose a novel end-to-end trainable approach called NeRFtrinsic Four. We
+            utilize Gaussian Fourier features to estimate extrinsic camera parameters and dynamically predict varying
+            intrinsic camera parameters through the supervision of the projection error. Our approach outperforms
+            existing joint optimization methods on LLFF and BLEFF. In addition to these existing datasets, we introduce
+            a new dataset called iFF with varying intrinsic camera parameters. NeRFtrinsic Four is a step forward in
+            joint optimization NeRF-based view synthesis and enables more realistic and flexible rendering in real-world
+            scenarios with varying camera parameters.
+        </div>
+    </div>
+    <br>
+    <br>
+    <div class="row">
+        <h3>Architecture</h3>
+        <div class="col-md-12" style="align-content: center; text-align: center">
+            <img src="https://user-images.githubusercontent.com/22636930/231704527-8c070d6b-0ac8-4432-9bd2-17725a04d191.png"
+                 style="width: 80%">
+        </div>
+    </div>
+    <br>
+    <br>
+    <div class="row">
+        <h3>Results</h3>
+    </div>
+    <div class="row">
+        <h5>LLFF</h5>
+        <div class="col-md-12" style="align-content: center; text-align: center">
+            <img src="https://user-images.githubusercontent.com/22636930/231704938-ae113dbc-d15f-4540-91fc-3deb95ebf8c8.png">
+        </div>
+    </div>
+    <div class="row">
+        <h5>BLEFF</h5>
+        <div class="col-md-12" style="align-content: center; text-align: center">
+            <img src="https://user-images.githubusercontent.com/22636930/231705973-028f4b1e-27c3-4d3e-ba24-038afd04ce6c.png">
+        </div>
+    </div>
+    <div class="row">
+        <h5>BLEFF</h5>
+        <div class="col-md-12" style="align-content: center; text-align: center">
+            <img src="https://user-images.githubusercontent.com/22636930/231706040-cb0ef15e-f923-419c-a71c-4d910c5220b4.png">
+        </div>
+    </div>
+    <br>
+    <br>
+    <div class="row">
+        <h3>iFF Dataset</h3>
+        <div class="col-md-12" style="align-content: center; text-align: center">
+            <img src="https://user-images.githubusercontent.com/22636930/231706690-bfa8a920-4800-48aa-9104-6dc0c33d4c4b.png"
+                 style="width: 80%">
+        </div>
+    </div>
+    <h3>Citation</h3>
+    <div class="row">
+        <div class="col-md-12">
+                <p style="background: lightgray; margin: 10px; padding: 10px;">
+                    @misc{schieber2023nerftrinsic,<br>
+                    &nbsp&nbsptitle={NeRFtrinsic Four: An End-To-End Trainable NeRF Jointly Optimizing Diverse Intrinsic and Extrinsic Camera Parameters},<br>
+                    &nbsp&nbspauthor={Hannah Schieber and Fabian Deuser and Bernhard Egger and Norbert Oswald and Daniel Roth},<br>
+                    &nbsp&nbspyear={2023},<br>
+                    &nbsp&nbspeprint={2303.09412},<br>
+                    &nbsp&nbsparchivePrefix={arXiv},<br>
+                    &nbspprimaryClass={cs.CV}<br>
+                    }
+                </p>
+        </div>
+    </div>
+</div>
+</div>
+
+
+</body>
+</html>
