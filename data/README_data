@@ -1,0 +1,12 @@
+## Data
+- Download datasets
+   - unzip the example data.zip
+   - make sure you have the structure
+       - data/
+            - iFF/T1
+            - LLFF/fern
+   - **note! we only have poses_bounds for reference**
+
+Dataset is under MIT license
+
+[Download](drive.google.com/file/d/1deYczPDEcsInCD4MkSKeH_ZMbq_TGGi4/view)
