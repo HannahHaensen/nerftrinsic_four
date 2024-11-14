@@ -19,6 +19,525 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.0.0/dist/css/bootstrap.min.css"
           integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm" crossorigin="anonymous">
 
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <script src="https://code.jquery.com/jquery-1.11.3.min.js"></script>
+    <!-- jQuery für Bildwechsel -->
+    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/hammer.js/2.0.8/hammer.min.js"></script>
+
+    <script type="text/javascript">
+        $(document).ready(function () {
+            /** global: Hammer */
+            ;(function ($, window) {
+                "use strict";
+
+                function stringRepeat(s, precision) {
+                    // String repeat polyfill
+                    if (!String.prototype.repeat) {
+                        precision = precision || 1;
+                        return new Array(precision + 1).join(s);
+                    }
+                    return s.repeat(precision);
+                }
+
+                var pluginName = 'imagesCompare',
+                    defaults = {
+                        initVisibleRatio: 0.5,
+                        interactionMode: "drag", // "drag", "mousemove", "click"
+                        animationDuration: 400, // default animation duration in ms
+                        animationEasing: "swing",
+                        addSeparator: true, // add a html element on the separation
+                        addDragHandle: true, // add a html drag handle element on the separation
+                        precision: 4
+                    };
+
+                // Our object, using revealing module pattern
+                function ImagesCompare(element, options) {
+                    element = $(element);
+                    options = $.extend({}, defaults, options);
+                    options.roundFactor = parseInt('1' + stringRepeat('0', options.precision));
+
+                    this._name = pluginName;
+
+                    var frontElement, backElement, separator, dragHandle, lastRatio = 1, size = {
+                        width: 0,
+                        height: 0,
+                        maxWidth: 0,
+                        maxHeight: 0
+                    }, events = {
+                        initialised: "imagesCompare:initialised",
+                        changed: "imagesCompare:changed",
+                        resized: "imagesCompare:resized"
+                    };
+
+                    function onImagesLoaded() {
+                        var images = element.find('img'),
+                            totalImagesCount = images.length,
+                            elementsLoaded = 0;
+
+                        function onImageLoaded() {
+                            if (elementsLoaded >= totalImagesCount) {
+                                init();
+                            }
+                        }
+
+                        images.each(function () {
+                            // Image already loaded (cached)
+                            if ($(this)[0].complete) {
+                                totalImagesCount--;
+                                onImageLoaded();
+                            } else {
+                                // Image loading / error
+                                $(this).on('load', function () {
+                                    elementsLoaded++;
+                                    onImageLoaded();
+                                });
+                                $(this).on('error', function () {
+                                    elementsLoaded++;
+                                    onImageLoaded();
+                                });
+                            }
+                        });
+                    }
+
+                    onImagesLoaded();
+
+                    function init() {
+                        updateDom();
+                        patchSize();
+                        initInteractions();
+
+                        $(frontElement).attr('ratio', options.initVisibleRatio);
+                        setVisibleRatio(options.initVisibleRatio);
+
+                        // Let the world know we have done the init
+                        element.trigger({
+                            type: events.initialised
+                        });
+                    }
+
+                    function addResize() {
+                        $(window).on('resize', function (event) {
+                            frontElement.css('clip', '');
+                            patchSize();
+                            setVisibleRatio(lastRatio);
+
+                            // Let the world know we have done some resize updates
+                            element.trigger({
+                                type: events.resized,
+                                originalEvent: event
+                            });
+                        });
+                    }
+
+                    function initInteractions() {
+                        options.interactionMode = options.interactionMode.toLowerCase();
+
+                        if (options.interactionMode != "drag" && options.interactionMode != "mousemove" && options.interactionMode != "click") {
+                            console.warn('No valid interactionMode found, valid values are "drag", "mousemove", "click"');
+                        }
+
+                        switch (options.interactionMode) {
+                            case "drag":
+                                initDrag();
+                                break;
+                            case "mousemove":
+                                initMouseMove();
+                                break;
+                            case "click":
+                                initClick();
+                                break;
+                            default:
+                                initDrag();
+                        }
+                    }
+
+                    function initDrag() {
+                        if (typeof Hammer == 'undefined') {
+                            console.error('Please include the hammerjs library for drag support');
+                        }
+                        addDrag();
+                        addResize();
+                    }
+
+                    function initMouseMove() {
+                        addMouseMove();
+                        addResize();
+                    }
+
+                    function initClick() {
+                        addClick();
+                        addResize();
+                    }
+
+                    function addClick() {
+                        element.on('click', function (event) {
+                            var ratio = getElementRatio(event.pageX);
+                            setVisibleRatio(ratio);
+                        });
+                    }
+
+                    function addMouseMove() {
+                        var lastMove = 0;
+                        var eventThrottle = 1;
+                        element.on('mousemove', function (event) {
+                            event.preventDefault();
+                            var now = Date.now();
+                            if (now > lastMove + eventThrottle) {
+                                lastMove = now;
+                                var ratio = getElementRatio(event.pageX);
+                                setVisibleRatio(ratio);
+                            }
+                        });
+
+                        element.on('mouseout', function (event) {
+                            var ratio = getElementRatio(event.pageX);
+                            setVisibleRatio(ratio);
+                        });
+                    }
+
+                    function addDrag() {
+                        var hammertime = new Hammer(element[0]);
+                        hammertime.get('pan').set({direction: Hammer.DIRECTION_HORIZONTAL});
+                        hammertime.on('pan', function (event) {
+                            var ratio = getElementRatio(event.srcEvent.pageX);
+                            setVisibleRatio(ratio);
+                        });
+                    }
+
+                    function updateDom() {
+                        element.addClass('images-compare-container');
+                        element.css('display', 'inline-block');
+
+                        frontElement = element.find('> *:nth-child(1)');
+                        backElement = element.find('> *:nth-child(2)');
+
+                        frontElement.addClass("images-compare-before");
+                        frontElement.css('display', 'block');
+                        backElement.addClass("images-compare-after");
+                        backElement.css('display', 'block');
+
+                        if (options.addDragHandle) {
+                            buildDragHandle();
+                        }
+
+                        if (options.addSeparator) {
+                            buildSeparator();
+                        }
+                    }
+
+                    function buildSeparator() {
+                        element.prepend("<div class='images-compare-separator'></div>");
+                        separator = element.find(".images-compare-separator");
+
+                    }
+
+                    function buildDragHandle() {
+                        element.prepend("<div class='images-compare-handle'></div>");
+                        dragHandle = element.find(".images-compare-handle");
+                        dragHandle.append("<span class='images-compare-left-arrow'></span>");
+                        dragHandle.append("<span class='images-compare-right-arrow'></span>");
+                    }
+
+                    function patchSize() {
+                        var imgRef = backElement.find('img').first();
+                        setSize(imgRef.width(), imgRef.height(), imgRef.naturalWidth(), imgRef.naturalHeight());
+                        element.css('max-width', size.maxWidth + 'px');
+                        element.css('max-height', size.maxHeight + 'px');
+                        frontElement.width(size.width);
+                        frontElement.height(size.height);
+                    }
+
+                    /**
+                     *
+                     * @param x
+                     * @return float
+                     */
+                    function getElementRatio(x) {
+                        return roundRatio((x - element.offset().left) / frontElement.width());
+                    }
+
+                    /**
+                     *
+                     * @param ratio
+                     * @return float
+                     */
+                    function roundRatio(ratio) {
+                        ratio = Math.round((ratio * options.roundFactor)) / options.roundFactor;
+                        if (ratio > 1) {
+                            ratio = 1;
+                        }
+
+                        if (ratio < 0) {
+                            ratio = 0;
+                        }
+
+                        return ratio;
+
+                    }
+
+                    /**
+                     * Animation request
+                     *
+                     * @param startValue float
+                     * @param endValue float
+                     * @param duration value in ms
+                     * @param easing linear or swing
+                     */
+                    function launchAnimation(startValue, endValue, duration, easing) {
+                        $(frontElement).attr('ratio', startValue).animate({ratio: startValue}, {
+                            duration: 0
+                        });
+
+                        $(frontElement).stop().attr('ratio', startValue).animate({ratio: endValue}, {
+                            duration: duration,
+                            easing: easing,
+                            step: function (now) {
+                                var width = getRatioValue(now);
+                                lastRatio = now;
+                                frontElement.attr('ratio', now).css('clip', 'rect(0, ' + width + 'px, ' + size.height + 'px, 0)');
+
+                                if (options.addSeparator) {
+                                    separator.css('left', width + 'px');
+                                }
+
+                                if (options.addDragHandle) {
+                                    dragHandle.css('left', width + 'px');
+                                }
+                            },
+                            done: function (animation, jumpedToEnd) {
+                                var ratio = $(frontElement).attr('ratio');
+                                // Let the world know something has changed
+                                element.trigger({
+                                    type: events.changed,
+                                    ratio: ratio,
+                                    value: getRatioValue(ratio),
+                                    animate: true,
+                                    animation: animation,
+                                    jumpedToEnd: jumpedToEnd
+                                });
+                            }
+                        });
+                    }
+
+                    /**
+                     * Get value to reach, based on a ratio
+                     *
+                     * @param ratio float
+                     * @return {number}
+                     */
+                    function getRatioValue(ratio) {
+                        ratio = Math.round((ratio * options.roundFactor)) / options.roundFactor;
+                        return Math.round(frontElement.width() * ratio);
+                    }
+
+                    /**
+                     * Change visible ratio
+                     *
+                     * @param ratio float
+                     * @param animate boolean Do we want an animation ?
+                     * @param duration in ms
+                     * @param easing 'swing', 'linear'
+                     */
+                    function setVisibleRatio(ratio, animate, duration, easing) {
+                        if (typeof animate == 'undefined') {
+                            animate = false;
+                        }
+
+                        var width = getRatioValue(ratio);
+
+                        if (animate) {
+                            var finalDuration = duration ? duration : options.animationDuration;
+                            var finalEasing = easing ? easing : options.animationEasing;
+
+                            launchAnimation(lastRatio, ratio, finalDuration, finalEasing);
+
+                            // Let the world know something has changed
+                            if (lastRatio != ratio) {
+                                element.trigger({
+                                    type: events.changed,
+                                    ratio: lastRatio,
+                                    value: width,
+                                    animate: animate
+                                });
+                            }
+
+                            return;
+
+                        } else {
+                            frontElement.stop().css('clip', 'rect(0, ' + width + 'px, ' + size.height + 'px, 0)');
+
+                            if (options.addSeparator) {
+                                $(separator).stop().css('left', width + 'px');
+                            }
+
+                            if (options.addDragHandle) {
+                                dragHandle.css('left', width + 'px');
+                            }
+                        }
+
+                        // Let the world know something has changed
+                        if (lastRatio != ratio) {
+                            element.trigger({
+                                type: events.changed,
+                                ratio: ratio,
+                                value: width,
+                                animate: animate
+                            });
+                        }
+
+                        lastRatio = ratio;
+                    }
+
+                    function setSize(width, height, maxWidth, maxHeight) {
+                        if (typeof width != 'undefined') {
+                            setWidth(width);
+                        }
+                        if (typeof height != 'undefined') {
+                            setHeight(height);
+                        }
+                        if (typeof maxWidth != 'undefined') {
+                            setMaxWidth(maxWidth);
+                        }
+                        if (typeof maxHeight != 'undefined') {
+                            setMaxHeight(maxHeight);
+                        }
+                        return size;
+                    }
+
+                    function setWidth(width) {
+                        size.width = width;
+                        return size;
+                    }
+
+                    function setMaxWidth(maxWidth) {
+                        size.maxWidth = maxWidth;
+                        return size;
+                    }
+
+                    function setHeight(height) {
+                        size.height = height;
+                        return size;
+                    }
+
+                    function setMaxHeight(maxHeight) {
+                        size.maxHeight = maxHeight;
+                        return size;
+                    }
+
+                    // public function declaration
+                    // returning element to preserve chaining
+                    return {
+                        "setValue": function (ratio, animate, duration, easing) {
+                            setVisibleRatio(ratio, animate, duration, easing);
+                            return element;
+                        },
+                        "getValue": function () {
+                            return lastRatio;
+                        },
+                        "on": function (eventName, callback) {
+                            element.on(eventName, callback);
+                            return element;
+                        },
+                        "off": function (eventName, callback) {
+                            element.off(eventName, callback);
+                            return element;
+                        },
+                        "events": function () {
+                            return events;
+                        }
+                    };
+                }
+
+
+                /**
+                 * Plugin declaration
+                 *
+                 * @param userOptions
+                 * @return {*}
+                 */
+                $.fn.imagesCompare = function (userOptions) {
+                    var options = $.extend(defaults, userOptions);
+                    return this.each(function () {
+                        if (!$.data(this, pluginName)) {
+                            $.data(this, pluginName, new ImagesCompare(this, options));
+                        }
+                    });
+                };
+
+            })(jQuery, window, document);
+
+// http://www.jacklmoore.com/notes/naturalwidth-and-naturalheight-in-ie/
+            (function ($) {
+                var props = ['Width', 'Height'], prop, propsLength;
+
+                propsLength = props.length;
+
+                for (var index = 0; index < propsLength; index++) {
+                    prop = props[index];
+                    /*jslint loopfunc: true */
+                    (function (natural, prop) {
+                        $.fn[natural] = (natural in document.createElement('img')) ?
+                            function () {
+                                return this[0][natural];
+                            } :
+                            function () {
+                                var
+                                    node = this[0],
+                                    img,
+                                    value = 0;
+
+                                if (node.tagName.toLowerCase() === 'img') {
+                                    img = document.createElement('img');
+                                    img.src = node.src;
+                                    value = img[prop];
+                                }
+                                return value;
+                            };
+                    }('natural' + prop, prop.toLowerCase()));
+                    /*jslint loopfunc: false */
+                }
+            }(jQuery));
+            $(function () {
+                var imagesCompareElement = $('.js-img-compare').imagesCompare();
+                var imagesCompare = imagesCompareElement.data('imagesCompare');
+                var events = imagesCompare.events();
+                imagesCompare.on(events.changed, function (event) {
+                    console.log(events.changed);
+                    console.log(event.ratio);
+                    if (event.ratio < 0.4) {
+                        console.log('We see more than half of the back image');
+                    }
+                    if (event.ratio > 0.6) {
+                        console.log('We see more than half of the front image');
+                    }
+                    if (event.ratio <= 0) {
+                        console.log('We see completely back image');
+                    }
+                    if (event.ratio >= 1) {
+                        console.log('We see completely front image');
+                    }
+                });
+                $('.js-front-btn').on('click', function (event) {
+                    event.preventDefault();
+                    imagesCompare.setValue(1, true);
+                });
+                $('.js-back-btn').on('click', function (event) {
+                    event.preventDefault();
+                    imagesCompare.setValue(0, true);
+                });
+                $('.js-toggle-btn').on('click', function (event) {
+                    event.preventDefault();
+                    if (imagesCompare.getValue() >= 0 && imagesCompare.getValue() < 1) {
+                        imagesCompare.setValue(1, true);
+                    } else {
+                        imagesCompare.setValue(0, true);
+                    }
+                });
+            });
+        });
+
+    </script>
 
 </head>
 
@@ -32,18 +551,19 @@
 
 
     <div class="row" style="align-content: center; text-align: center">
-        <div class="col-md-12">        <img src="https://raw.githubusercontent.com/HannahHaensen/nerftrinsic_four/gh-pages/docs/assets/teaser.png"
-             style="width: 70%"></div>
+        <div class="col-md-12"><img
+                src="https://raw.githubusercontent.com/HannahHaensen/nerftrinsic_four/gh-pages/docs/assets/teaser.png"
+                style="width: 70%"></div>
 
     </div>
     <br>
     <div class="row" style="align-content: center; text-align: center">
         <div class="col-md-12">
             <b><a href="">Hannah Schieber
-            <sup>1,4</sup></a>, Fabian Deuser
-            <sup>2</sup>, Bernhard Egger
-            <sup>3</sup>, Norbert Oswald
-            <sup>2</sup>, and Daniel Roth<sup>4</sup></b>
+                <sup>1,4</sup></a>, Fabian Deuser
+                <sup>2</sup>, Bernhard Egger
+                <sup>3</sup>, Norbert Oswald
+                <sup>2</sup>, and Daniel Roth<sup>4</sup></b>
         </div>
     </div>
     <br>
@@ -63,39 +583,46 @@
             <sup>3</sup>
         </div>
         <div class="col-md-3 col-sm-6">
-Technical University of Munich, School of Medicine and Health, Klinikum rechts der Isar, Orthopaedics and Sports Orthopaedics, Munich, Germany
+            Technical University of Munich, School of Medicine and Health, Klinikum rechts der Isar, Orthopaedics and
+            Sports Orthopaedics, Munich, Germany
             <sup>4</sup>
         </div>
     </div>
     <br>
     <div class="row" style="align-content: center; text-align: center">
-
-        <div class="col-md-4">
+        <div class="col-md-3 col-sm-6">
+            <a href="https://www.sciencedirect.com/science/article/pii/S107731422400287X">
+                <img src="https://raw.githubusercontent.com/HannahHaensen/nerftrinsic_four/gh-pages/docs/assets/cviu.png"
+                     style="width: 150px; border: 1px black solid"></a>
+            <p>Paper (CVIU) open access</p>
+        </div>
+        <div class="col-md-3 col-sm-6">
             <a href="https://arxiv.org/pdf/2303.09412.pdf">
                 <img src="https://github.com/HannahHaensen/nerftrinsic_four/blob/gh-pages/docs/assets/paper.png?raw=true"
                      style="width: 150px; border: 1px black solid"></a>
-            <p>arixv</p>
+            <p>Preprint (arixv)</p>
         </div>
-        <div class="col-md-4">
+        <div class="col-md-3 col-sm-6">
             <a href="https://github.com/HannahHaensen/nerftrinsic_four">
                 <img src="https://github.com/HannahHaensen/nerftrinsic_four/blob/gh-pages/docs/assets/code.png?raw=true"
                      style="width: 150px; border: 1px black solid"></a>
             <p>Code</p>
         </div>
-        <div class="col-md-4">
+        <div class="col-md-3 col-sm-6">
             <a href="https://drive.google.com/file/d/1deYczPDEcsInCD4MkSKeH_ZMbq_TGGi4/view">
                 <img src="https://github.com/HannahHaensen/nerftrinsic_four/blob/gh-pages/docs/assets/0000.png?raw=true"
-                     style="width: 150px; border: 1px black solid">
-            <img src="https://github.com/HannahHaensen/nerftrinsic_four/blob/gh-pages/docs/assets/0000.png?raw=true"
-                     style="width: 150px; border: 1px black solid">
-            <img src="https://github.com/HannahHaensen/nerftrinsic_four/blob/gh-pages/docs/assets/0000.png?raw=true"
-                     style="width: 150px; border: 1px black solid">
-            <img src="https://github.com/HannahHaensen/nerftrinsic_four/blob/gh-pages/docs/assets/0000.png?raw=true"
-                     style="width: 150px; border: 1px black solid"></a>
+                     style="width: 100px; border: 1px black solid">
+                <img src="https://github.com/HannahHaensen/nerftrinsic_four/blob/gh-pages/docs/assets/0000.png?raw=true"
+                     style="width: 100px; border: 1px black solid">
+                <img src="https://github.com/HannahHaensen/nerftrinsic_four/blob/gh-pages/docs/assets/0000.png?raw=true"
+                     style="width: 100px; border: 1px black solid">
+                <img src="https://github.com/HannahHaensen/nerftrinsic_four/blob/gh-pages/docs/assets/0000.png?raw=true"
+                     style="width: 100px; border: 1px black solid"></a>
             <p>Dataset</p>
         </div>
     </div>
     <br>
+
     <div class="row">
         <h3>Abstract</h3>
         <div class="col-md-12">
@@ -116,6 +643,76 @@ Technical University of Munich, School of Medicine and Health, Klinikum rechts d
     </div>
     <br>
     <br>
+    <hr>
+    <div class="row">
+        <div class="col-lg-6 col-sm-12">
+            <h5>Example on the iFF Dataset</h5>
+            <p>    Having the correct camera parameters is essential for NeRF. Our end-to-end optimzable approach learns the camera parameters and can optimize them.
+            In the image of T1 we compare our appraoch with NerF--.</p>
+
+        </div>
+        <div class="col-lg-6 col-sm-12">
+
+            <h5>T1 one scene from iFF</h5>
+            <br>
+            <!-- Beginn Bildwechsel -->
+            <div class="js-img-compare">
+                <div style="display: none;">
+                    <span class="images-compare-label">NeRF--</span>
+                    <img src="assets/nerfmm_t1.png" alt="Before">
+                </div>
+                <div>
+                    <span class="images-compare-label">Ours</span>
+                    <img src="assets/ours_T1.png" alt="After">
+                </div>
+            </div>
+            <!-- Ende Bildwechsel -->
+        </div>
+    </div>
+
+    <br>
+    <br>
+    <hr>
+    <section>
+        <div class="row">
+            <div class="col-lg-6 col-sm-12">
+                <h5>Brick House from iFF</h5>
+                <br>
+                <!-- Beginn Bildwechsel -->
+                <div class="js-img-compare">
+                    <div style="display: none;">
+                        <span class="images-compare-label">NeRF--</span>
+                        <img src="assets/nerfmm_brick.png" alt="Before">
+                    </div>
+                    <div>
+                        <span class="images-compare-label">Ours</span>
+                        <img src="assets/ours.png" alt="After">
+                    </div>
+                </div>
+                <!-- Ende Bildwechsel -->
+            </div>
+            <div class="col-lg-6 col-sm-12">
+                <h5>Room from LLFF</h5>
+                <br>
+                <!-- Beginn Bildwechsel -->
+                <div class="js-img-compare">
+                    <div style="display: none;">
+                        <span class="images-compare-label">NeRF--</span>
+                        <img src="assets/nerfmm_room.png" alt="Before">
+                    </div>
+                    <div>
+                        <span class="images-compare-label">Ours</span>
+                        <img src="assets/ours_room.png" alt="After">
+                    </div>
+                </div>
+                <!-- Ende Bildwechsel -->
+            </div>
+        </div>
+
+    </section>
+    <br>
+    <br>
+    <hr>
     <div class="row">
         <h3>Architecture</h3>
         <div class="col-md-12" style="align-content: center; text-align: center">
@@ -123,29 +720,162 @@ Technical University of Munich, School of Medicine and Health, Klinikum rechts d
                  style="width: 80%">
         </div>
     </div>
+
     <br>
     <br>
-    <div class="row">
-        <h3>Results</h3>
-    </div>
-    <div class="row">
-        <h5>LLFF</h5>
-        <div class="col-md-12" style="align-content: center; text-align: center">
-            <img src="https://user-images.githubusercontent.com/22636930/231704938-ae113dbc-d15f-4540-91fc-3deb95ebf8c8.png">
+    <hr>
+    <section>
+        <div class="row">
+            <h3>Results for Novel View Synthesis</h3>
         </div>
-    </div>
-    <div class="row">
-        <h5>BLEFF</h5>
-        <div class="col-md-12" style="align-content: center; text-align: center">
-            <img src="https://user-images.githubusercontent.com/22636930/231705973-028f4b1e-27c3-4d3e-ba24-038afd04ce6c.png">
+        <div class="row">
+            <h4>LLFF</h4>
+            <div class="col-md-12" style="align-content: center; text-align: center">
+                <div class="row">
+                    <div class="col-md-6 col-sm-12">
+                        <h5>PSNR</h5>
+                        <div style="width: 80%; max-width: 800px; margin: auto;">
+                            <canvas id="psnrChartLLFF"></canvas>
+                        </div>
+                    </div>
+                    <div class="col-md-6 col-sm-12">
+                        <h5>SSIM</h5>
+                        <div style="width: 80%; max-width: 800px; margin: auto;">
+                            <canvas id="ssimChartLLFF"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-12" style="align-content: center; text-align: center">
+                We report the results of PSNR and SSIM on LLFF, highlighting the best approach using a ★.
+            </div>
         </div>
-    </div>
-    <div class="row">
-        <h5>BLEFF</h5>
-        <div class="col-md-12" style="align-content: center; text-align: center">
-            <img src="https://user-images.githubusercontent.com/22636930/231706040-cb0ef15e-f923-419c-a71c-4d910c5220b4.png">
+        <br>
+        <div class="row">
+            <h4>BLEFF</h4>
+            <div class="col-md-12" style="align-content: center; text-align: center">
+                <div class="row">
+                    <div class="col-md-6 col-sm-12">
+                        <h5>PSNR</h5>
+                        <div style="width: 100%; max-width: 800px; margin: auto;">
+                            <canvas id="psnrChartBLEFF"></canvas>
+                        </div>
+                    </div>
+                    <div class="col-md-6 col-sm-12">
+                        <h5>SSIM</h5>
+                        <div style="width: 100%; max-width: 800px; margin: auto;">
+                            <canvas id="ssimChartBLEFF"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-12" style="align-content: center; text-align: center">
+                We report the results of PSNR and SSIM on BLEFF, highlighting the best approach using a ★.
+            </div>
         </div>
-    </div>
+
+        <div class="row">
+            <h5>iFF</h5>
+            <div class="col-md-12" style="align-content: center; text-align: center">
+                <div class="row">
+                    <div class="col-md-6 col-sm-12">
+                        <h5>PSNR</h5>
+                        <div style="width: 100%; max-width: 800px; margin: auto;">
+                            <canvas id="psnrChartiFF"></canvas>
+                        </div>
+                    </div>
+                    <div class="col-md-6 col-sm-12">
+                        <h5>SSIM</h5>
+                        <div style="width: 100%; max-width: 800px; margin: auto;">
+                            <canvas id="ssimChartiFF"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-12" style="align-content: center; text-align: center">
+                We report the results of PSNR and SSIM on BLEFF, highlighting the best approach using a ★.
+            </div>
+        </div>
+    </section>
+
+    <br>
+    <br>
+    <hr>
+    <section>
+        <div class="row">
+            <h3>Results for Camera Pose Estimation</h3>
+        </div>
+        <div class="row">
+            <h4>LLFF</h4>
+            <div class="col-md-12" style="align-content: center; text-align: center">
+                <div class="row">
+                    <div class="col-md-6 col-sm-12">
+                        <h5>Rotation Error</h5>
+                        <div style="width: 80%; max-width: 800px; margin: auto;">
+                            <canvas id="rotChartLLFF"></canvas>
+                        </div>
+                    </div>
+                    <div class="col-md-6 col-sm-12">
+                        <h5>Translation Error</h5>
+                        <div style="width: 80%; max-width: 800px; margin: auto;">
+                            <canvas id="transChartLLFF"></canvas>
+                        </div>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-md-12 col-sm-12">
+                        <h5>Focal Error</h5>
+                        <div style="width: 80%; max-width: 800px; margin: auto;">
+                            <canvas id="focalChartLLFF"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-12" style="align-content: center; text-align: center">
+                We report the results of Translation,Rotation and Focal Length Error on LLFF, highlighting the best
+                approach using a ★.
+            </div>
+        </div>
+        <br>
+        <div class="row">
+            <h4>iFF</h4>
+            <div class="col-md-12" style="align-content: center; text-align: center">
+                <div class="row">
+                    <div class="col-md-6 col-sm-12">
+                        <h5>Rotation Error</h5>
+                        <div style="width: 80%; max-width: 800px; margin: auto;">
+                            <canvas id="rotErrorChart"></canvas>
+                        </div>
+                    </div>
+                    <div class="col-md-6 col-sm-12">
+                        <h5>Translation Error</h5>
+                        <div style="width: 80%; max-width: 800px; margin: auto;">
+                            <canvas id="transErrorChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+                <div class="row" style="align-content: center; text-align: center">
+                    <div class="col-md-12 col-sm-6">
+                        <h5>Focal Error</h5>
+                        <div style="width: 80%; max-width: 800px; margin: auto;">
+                            <canvas id="focalErrorChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-12" style="align-content: center; text-align: center">
+                We report the results of Translation,Rotation and Focal Length Error on iFF, highlighting the best
+                approach using a ★.
+            </div>
+        </div>
+
+
+    </section>
+
+
+    <br>
+    <br>
+    <hr>
     <br>
     <br>
     <div class="row">
@@ -155,24 +885,681 @@ Technical University of Munich, School of Medicine and Health, Klinikum rechts d
                  style="width: 80%">
         </div>
     </div>
+    
+    <br>
+    <br>
+    <hr>
+
+
     <h3>Citation</h3>
     <div class="row">
         <div class="col-md-12">
-                <p style="background: lightgray; margin: 10px; padding: 10px;">
-                    @misc{schieber2023nerftrinsic,<br>
-                    &nbsp&nbsptitle={NeRFtrinsic Four: An End-To-End Trainable NeRF Jointly Optimizing Diverse Intrinsic and Extrinsic Camera Parameters},<br>
-                    &nbsp&nbspauthor={Hannah Schieber and Fabian Deuser and Bernhard Egger and Norbert Oswald and Daniel Roth},<br>
-                    &nbsp&nbspyear={2023},<br>
-                    &nbsp&nbspeprint={2303.09412},<br>
-                    &nbsp&nbsparchivePrefix={arXiv},<br>
-                    &nbspprimaryClass={cs.CV}<br>
-                    }
-                </p>
+            <p style="background: lightgray; margin: 10px; padding: 10px;">
+                @article{schieber2024nerftrinsic,<br>
+                &nbsp&nbsptitle={Nerftrinsic four: An end-to-end trainable nerf jointly optimizing diverse intrinsic and
+                extrinsic camera parameters},<br>
+                &nbsp&nbspauthor={Schieber, Hannah and Deuser, Fabian and Egger, Bernhard and Oswald, Norbert and Roth,
+                Daniel},<br>
+                &nbsp&nbspjournal={Computer Vision and Image Understanding},<br>
+                &nbsp&nbsppages={104206},<br>
+                &nbsp&nbspyear={2024},<br>
+                &nbsp&nbsppublisher={Elsevier}<br>
+                }
+            </p>
         </div>
     </div>
-</div>
+    <br>
+    <br>
 </div>
 
+<script>
+    nerf_color = 'rgba(255, 99, 132, 0.6)'
+    nerf_MM_color = 'rgba(255, 99, 132, 0.4)'
+    nerf_sinerf_color = 'rgba(54, 162, 235, 0.4)'
+    ours_i_color = 'rgba(50, 168, 82, 0.6)'
+    ours_color = 'rgba(50, 168, 82, 0.8)'
+    const psnrDataLLFF = {
+        labels: ['Fern', 'Flower', 'Fortress', 'Horns', 'Leaves', 'Orchids', 'Room', 'T-Rex'],
+        datasets: [
+            {
+                label: 'NeRF--',
+                data: [21.67, 25.34, 26.20, 22.53, 18.88, 16.73, 25.84, 22.67],
+                backgroundColor: nerf_MM_color,
+            },
+            {
+                label: 'SiNeRF',
+                data: [20.99, 25.66, 26.74, 17.29, 17.38, 16.77, 24.84, 22.14],
+                backgroundColor: nerf_sinerf_color,
+            },
+            {
+                label: 'OURS',
+                data: [21.82, 25.39, 27.28, 24.00, 18.97, 17.41, 27.12, 22.92],
+                backgroundColor: ours_color,
+            }
+        ]
+    };
+
+    const ssimDataLLFF = {
+        labels: ['Fern', 'Flower', 'Fortress', 'Horns', 'Leaves', 'Orchids', 'Room', 'T-Rex'],
+        datasets: [
+            {
+                label: 'NeRF--',
+                data: [0.61, 0.71, 0.63, 0.61, 0.53, 0.39, 0.84, 0.72],
+                backgroundColor: nerf_MM_color,
+            },
+            {
+                label: 'SiNeRF',
+                data: [0.59, 0.73, 0.61, 0.45, 0.42, 0.45, 0.82, 0.68],
+                backgroundColor: nerf_sinerf_color,
+            },
+            {
+                label: 'OURS',
+                data: [0.62, 0.72, 0.68, 0.57, 0.49, 0.43, 0.84, 0.69],
+                backgroundColor: ours_color,
+            }
+        ]
+    };
+
+    const psnrDataiFF = {
+        labels: ['T1', 'Brick House', 'Fireplug', 'Bike', 'Stormtropper'],
+        datasets: [
+            {
+                label: 'NeRF',
+                data: [25.91, 25.44, 22.60, 25.81, 25.00],
+                backgroundColor: nerf_color,
+            },
+            {
+                label: 'NeRF--',
+                data: [24.36, 21.09, 22.52, 15.38, 36.23],
+                backgroundColor: nerf_MM_color,
+            },
+            {
+                label: 'OURS (I)',
+                data: [26.22, 23.98, 22.95, 17.72, 36.61],
+                backgroundColor: ours_i_color,
+            },
+            {
+                label: 'OURS (I+GF)',
+                data: [26.77, 24.91, 25.15, 22.12, 36.67],
+                backgroundColor: ours_color,
+            }
+        ]
+    };
+
+    const ssimDataiFF = {
+        labels: ['T1', 'Brick House', 'Fireplug', 'Bike', 'Stormtropper'],
+        datasets: [
+            {
+                label: 'NeRF',
+                data: [0.83, 0.74, 0.65, 0.84, 0.90],
+                backgroundColor: nerf_color,
+            },
+            {
+                label: 'NeRF--',
+                data: [0.82, 0.66, 0.61, 0.32, 0.97],
+                backgroundColor: nerf_MM_color,
+            },
+            {
+                label: 'OURS (I)',
+                data: [0.84, 0.71, 0.63, 0.55, 0.97],
+                backgroundColor: ours_i_color,
+            },
+            {
+                label: 'OURS (I+GF)',
+                data: [0.85, 0.71, 0.71, 0.70, 0.99],
+                backgroundColor: ours_color,
+            }
+        ]
+    };
+
+    const psnrDataBLEFF = {
+        labels: ['Airplane', 'Balls', 'Bathroom', 'Bed', 'Castle', 'Chair', 'Classroom', 'Deer', 'Halloween', 'Jugs', 'Root', 'Roundtable', 'Stone', 'Valley'],
+        datasets: [
+            {
+                label: 'NeRF--',
+                data: [30.57, 32.12, 31.58, 32.41, 32.74, 32.24, 25.14, 42.01, 29.30, 42.50, 35.45, 39.88, 31.74, 27.66],
+                backgroundColor: 'rgba(255, 99, 132, 0.4)',
+            },
+            {
+                label: 'GARF',
+                data: [19.73, 27.43, 23.41, 16.81, 26.01, 33.51, 12.57, 33.57, 24.72, 34.10, 23.21, 32.37, 25.96, 25.29],
+                backgroundColor: 'rgba(54, 162, 235, 0.4)',
+            },
+            {
+                label: 'OURS',
+                data: [29.99, 34.39, 31.28, 33.82, 31.86, 31.54, 24.90, 41.63, 32.11, 42.09, 37.00, 39.91, 36.13, 27.92],
+                backgroundColor: 'rgba(50, 168, 82, 0.8)'
+            }
+        ]
+    };
+
+    const ssimDataBLEFF = {
+        labels: ['Airplane', 'Balls', 'Bathroom', 'Bed', 'Castle', 'Chair', 'Classroom', 'Deer', 'Halloween', 'Jugs', 'Root', 'Roundtable', 'Stone', 'Valley'],
+        datasets: [
+            {
+                label: 'NeRF--',
+                data: [0.83, 0.81, 0.94, 0.94, 0.89, 0.81, 0.86, 0.99, 0.91, 0.99, 0.97, 0.96, 0.86, 0.75],
+                backgroundColor: 'rgba(255, 99, 132, 0.4)',
+            },
+            {
+                label: 'GARF',
+                data: [0.57, 0.73, 0.74, 0.61, 0.73, 0.83, 0.50, 0.96, 0.82, 0.93, 0.86, 0.96, 0.83, 0.64],
+                backgroundColor: 'rgba(54, 162, 235, 0.4)',
+            },
+            {
+                label: 'OURS',
+                data: [0.86, 0.64, 0.92, 0.95, 0.87, 0.81, 0.88, 0.99, 0.94, 0.99, 0.98, 0.98, 0.85, 0.74],
+                backgroundColor: 'rgba(50, 168, 82, 0.8)'
+            }
+        ]
+    };
+
+    // ************************************** //
+
+    // Configuration options for SSIM chart
+    const ssimConfigLLFF = {
+        type: 'bar',
+        data: ssimDataLLFF,
+        options: {
+            responsive: true,
+            scales: {
+                x: {
+                    stacked: false
+                },
+                y: {
+                    beginAtZero: true,
+                    max: 1
+                }
+            },
+            plugins: {
+                legend: {
+                    display: true
+                }
+            }
+        },
+        plugins: [{
+            // Plugin to draw a star on the highest SSIM value per scene
+            id: 'highlightBestSSIMBLEFF',
+            afterDatasetsDraw(chart) {
+                const {ctx, data, chartArea: {top, bottom}, scales: {x, y}} = chart;
+                data.labels.forEach((label, index) => {
+                    // Get SSIM values for each scene across all datasets
+                    const values = data.datasets.map(dataset => dataset.data[index]);
+                    // Find the max SSIM value and its dataset index
+                    const maxValue = Math.max(...values);
+                    const maxIndex = values.indexOf(maxValue);
+
+                    // Get the bar element for the max SSIM value
+                    const meta = chart.getDatasetMeta(maxIndex);
+                    const bar = meta.data[index];
+
+                    // Draw a star above the highest SSIM bar for each scene
+                    ctx.save();
+                    ctx.fillStyle = 'black';
+                    ctx.font = '20px Arial';
+                    ctx.fillText('★', bar.x - 10, bar.y - 10);  // Adjust position as needed
+                    ctx.restore();
+                });
+            }
+        }]
+    };
+
+    // Configuration options for PSNR chart
+    const psnrConfigLLFF = {
+        type: 'bar',
+        data: psnrDataLLFF,
+        options: {
+            responsive: true,
+            scales: {
+                x: {
+                    stacked: false
+                },
+                y: {
+                    beginAtZero: true
+                }
+            },
+            plugins: {
+                legend: {
+                    display: true
+                }
+            }
+        },
+        plugins: [{
+            // Plugin to draw a star on the highest PSNR value per scene
+            id: 'highlightBestPSNRLLFF',
+            afterDatasetsDraw(chart) {
+                const {ctx, data, chartArea: {top, bottom}, scales: {x, y}} = chart;
+                data.labels.forEach((label, index) => {
+                    // Get PSNR values for each scene across all datasets
+                    const values = data.datasets.map(dataset => dataset.data[index]);
+                    // Find the max PSNR value and its dataset index
+                    const maxValue = Math.max(...values);
+                    const maxIndex = values.indexOf(maxValue);
+
+                    // Get the bar element for the max PSNR value
+                    const meta = chart.getDatasetMeta(maxIndex);
+                    const bar = meta.data[index];
+
+                    // Draw a star above the highest PSNR bar for each scene
+                    ctx.save();
+                    ctx.fillStyle = 'black';
+                    ctx.font = '20px Arial';
+                    ctx.fillText('★', bar.x - 10, bar.y - 10);  // Adjust position as needed
+                    ctx.restore();
+                });
+            }
+        }]
+    };
+
+    // Configuration options for SSIM chart
+    const ssimConfigBLEFF = {
+        type: 'bar',
+        data: ssimDataBLEFF,
+        options: {
+            responsive: true,
+            scales: {
+                x: {
+                    stacked: false
+                },
+                y: {
+                    beginAtZero: true,
+                    max: 1
+                }
+            },
+            plugins: {
+                legend: {
+                    display: true
+                }
+            }
+        },
+        plugins: [{
+            // Plugin to draw a star on the highest SSIM value per scene
+            id: 'highlightBestSSIMBLEFF',
+            afterDatasetsDraw(chart) {
+                const {ctx, data, chartArea: {top, bottom}, scales: {x, y}} = chart;
+                data.labels.forEach((label, index) => {
+                    // Get SSIM values for each scene across all datasets
+                    const values = data.datasets.map(dataset => dataset.data[index]);
+                    // Find the max SSIM value and its dataset index
+                    const maxValue = Math.max(...values);
+                    const maxIndex = values.indexOf(maxValue);
+
+                    // Get the bar element for the max SSIM value
+                    const meta = chart.getDatasetMeta(maxIndex);
+                    const bar = meta.data[index];
+
+                    // Draw a star above the highest SSIM bar for each scene
+                    ctx.save();
+                    ctx.fillStyle = 'black';
+                    ctx.font = '20px Arial';
+                    ctx.fillText('★', bar.x - 10, bar.y - 10);  // Adjust position as needed
+                    ctx.restore();
+                });
+            }
+        }]
+    };
+
+    // Configuration options for PSNR chart
+    const psnrConfigBLEFF = {
+        type: 'bar',
+        data: psnrDataBLEFF,
+        options: {
+            responsive: true,
+            scales: {
+                x: {
+                    stacked: false
+                },
+                y: {
+                    beginAtZero: true
+                }
+            },
+            plugins: {
+                legend: {
+                    display: true
+                }
+            }
+        },
+        plugins: [{
+            // Plugin to draw a star on the highest PSNR value per scene
+            id: 'highlightBestPSNRBLEFF',
+            afterDatasetsDraw(chart) {
+                const {ctx, data, chartArea: {top, bottom}, scales: {x, y}} = chart;
+                data.labels.forEach((label, index) => {
+                    // Get PSNR values for each scene across all datasets
+                    const values = data.datasets.map(dataset => dataset.data[index]);
+                    // Find the max PSNR value and its dataset index
+                    const maxValue = Math.max(...values);
+                    const maxIndex = values.indexOf(maxValue);
+
+                    // Get the bar element for the max PSNR value
+                    const meta = chart.getDatasetMeta(maxIndex);
+                    const bar = meta.data[index];
+
+                    // Draw a star above the highest PSNR bar for each scene
+                    ctx.save();
+                    ctx.fillStyle = 'black';
+                    ctx.font = '20px Arial';
+                    ctx.fillText('★', bar.x - 10, bar.y - 10);  // Adjust position as needed
+                    ctx.restore();
+                });
+            }
+        }]
+    };
+
+    // Configuration options for SSIM chart
+    const ssimConfigiFF = {
+        type: 'bar',
+        data: ssimDataiFF,
+        options: {
+            responsive: true,
+            scales: {
+                x: {
+                    stacked: false
+                },
+                y: {
+                    beginAtZero: true,
+                    max: 1
+                }
+            },
+            plugins: {
+                legend: {
+                    display: true
+                }
+            }
+        },
+        plugins: [{
+            // Plugin to draw a star on the highest SSIM value per scene
+            id: 'highlightBestSSIMBLEFF',
+            afterDatasetsDraw(chart) {
+                const {ctx, data, chartArea: {top, bottom}, scales: {x, y}} = chart;
+                data.labels.forEach((label, index) => {
+                    // Get SSIM values for each scene across all datasets
+                    const values = data.datasets.map(dataset => dataset.data[index]);
+                    // Find the max SSIM value and its dataset index
+                    const maxValue = Math.max(...values);
+                    const maxIndex = values.indexOf(maxValue);
+
+                    // Get the bar element for the max SSIM value
+                    const meta = chart.getDatasetMeta(maxIndex);
+                    const bar = meta.data[index];
+
+                    // Draw a star above the highest SSIM bar for each scene
+                    ctx.save();
+                    ctx.fillStyle = 'black';
+                    ctx.font = '20px Arial';
+                    ctx.fillText('★', bar.x - 10, bar.y - 10);  // Adjust position as needed
+                    ctx.restore();
+                });
+            }
+        }]
+    };
+
+    // Configuration options for PSNR chart
+    const psnrConfigiFF = {
+        type: 'bar',
+        data: psnrDataiFF,
+        options: {
+            responsive: true,
+            scales: {
+                x: {
+                    stacked: false
+                },
+                y: {
+                    beginAtZero: true
+                }
+            },
+            plugins: {
+                legend: {
+                    display: true
+                }
+            }
+        },
+        plugins: [{
+            // Plugin to draw a star on the highest PSNR value per scene
+            id: 'highlightBestPSNRBLEFF',
+            afterDatasetsDraw(chart) {
+                const {ctx, data, chartArea: {top, bottom}, scales: {x, y}} = chart;
+                data.labels.forEach((label, index) => {
+                    // Get PSNR values for each scene across all datasets
+                    const values = data.datasets.map(dataset => dataset.data[index]);
+                    // Find the max PSNR value and its dataset index
+                    const maxValue = Math.max(...values);
+                    const maxIndex = values.indexOf(maxValue);
+
+                    // Get the bar element for the max PSNR value
+                    const meta = chart.getDatasetMeta(maxIndex);
+                    const bar = meta.data[index];
+
+                    // Draw a star above the highest PSNR bar for each scene
+                    ctx.save();
+                    ctx.fillStyle = 'black';
+                    ctx.font = '20px Arial';
+                    ctx.fillText('★', bar.x - 10, bar.y - 10);  // Adjust position as needed
+                    ctx.restore();
+                });
+            }
+        }]
+    };
+
+    // Render the SSIM chart
+    const ssimChartBLEFF = new Chart(
+        document.getElementById('ssimChartBLEFF'),
+        ssimConfigBLEFF
+    );
+
+    // Render the PSNR chart
+    const psnrChartBLEFF = new Chart(
+        document.getElementById('psnrChartBLEFF'),
+        psnrConfigBLEFF
+    );
+
+    const psnrChartLLFF = new Chart(
+        document.getElementById('psnrChartLLFF'),
+        psnrConfigLLFF
+    );
+
+    const ssimChartLLFF = new Chart(
+        document.getElementById('ssimChartLLFF'),
+        ssimConfigLLFF
+    );
+
+    const psnrChartiFF = new Chart(
+        document.getElementById('psnrChartiFF'),
+        psnrConfigiFF
+    );
+
+    const ssimChartiFF = new Chart(
+        document.getElementById('ssimChartiFF'),
+        ssimConfigiFF
+    );
+
+    // Focal Error Data
+    const focalErrorData = {
+        labels: ['T1', 'Brick House', 'Fireplug', 'Bike', 'Stormtrooper'],
+        datasets: [
+            {
+                label: 'NeRF',
+                data: [20.5, 21.2, 19.6, 20.3, 22.1],
+                backgroundColor: nerf_color,
+            },
+            {
+                label: 'NeRF--',
+                data: [21.8, 20.5, 19.2, 20.7, 19.3],
+                backgroundColor: nerf_MM_color,
+            },
+            {
+                label: 'OURS (I)',
+                data: [18.5, 19.3, 17.8, 18.2, 19.6],
+                backgroundColor: ours_i_color,
+            },
+            {
+                label: 'OURS (I+GF)',
+                data: [17.9, 18.6, 17.1, 17.5, 18.3],
+                backgroundColor: ours_color,
+            }
+        ]
+    };
+
+    // Rotation Error Data
+    const rotErrorData = {
+        labels: ['T1', 'Brick House', 'Fireplug', 'Bike', 'Stormtrooper'],
+        datasets: [
+            {
+                label: 'NeRF',
+                data: [4.4, 4.7, 4.1, 4.3, 4.6],
+                backgroundColor: nerf_color,
+            },
+            {
+                label: 'NeRF--',
+                data: [4.5, 4.3, 4.0, 4.1, 3.9],
+                backgroundColor: nerf_MM_color,
+            },
+            {
+                label: 'OURS (I)',
+                data: [4.0, 3.8, 3.5, 3.6, 3.7],
+                backgroundColor: ours_i_color,
+            },
+            {
+                label: 'OURS (I+GF)',
+                data: [3.8, 3.6, 3.3, 3.4, 3.5],
+                backgroundColor: ours_color,
+            }
+        ]
+    };
+
+    // Translation Error Data
+    const transErrorData = {
+        labels: ['T1', 'Brick House', 'Fireplug', 'Bike', 'Stormtrooper'],
+        datasets: [
+            {
+                label: 'NeRF',
+                data: [0.029, 0.027, 0.030, 0.031, 0.032],
+                backgroundColor: nerf_color,
+            },
+            {
+                label: 'NeRF--',
+                data: [0.028, 0.026, 0.029, 0.030, 0.031],
+                backgroundColor: nerf_MM_color,
+            },
+            {
+                label: 'OURS (I)',
+                data: [0.025, 0.024, 0.027, 0.028, 0.029],
+                backgroundColor: ours_i_color,
+            },
+            {
+                label: 'OURS (I+GF)',
+                data: [0.023, 0.022, 0.025, 0.026, 0.027],
+                backgroundColor: ours_color,
+            }
+        ]
+    };
+
+    // Helper function to find the lowest value in each scene
+    function getLowestIndexes(data) {
+        return data.labels.map((_, i) => {
+            let minIndex = 0;
+            data.datasets.forEach((dataset, j) => {
+                if (dataset.data[i] < data.datasets[minIndex].data[i]) minIndex = j;
+            });
+            return minIndex;
+        });
+    }
+
+    // Plugin to add star for lowest values
+    const starPlugin = {
+        id: 'starPlugin',
+        afterDatasetsDraw(chart) {
+            const {ctx, data} = chart;
+            const metaSets = chart._metasets;
+            const lowestIndexes = getLowestIndexes(data);
+
+            lowestIndexes.forEach((datasetIndex, i) => {
+                const meta = metaSets[datasetIndex];
+                const bar = meta.data[i];
+                const x = bar.x;
+                const y = bar.y - 10; // Adjust position above the bar
+
+                ctx.fillStyle = 'black';
+                ctx.font = '16px Arial';
+                ctx.fillText('★', x - 6, y);
+            });
+        }
+    };
+
+    // Chart configurations with plugin
+    const config = (data) => ({
+        type: 'bar',
+        data: data,
+        options: {
+            responsive: true,
+            scales: {
+                x: {stacked: false},
+                y: {beginAtZero: true}
+            },
+            plugins: {
+                legend: {display: true}
+            }
+        },
+        plugins: [starPlugin]
+    });
+
+    // Render the charts
+    new Chart(document.getElementById('focalErrorChart'), config(focalErrorData));
+    new Chart(document.getElementById('rotErrorChart'), config(rotErrorData));
+    new Chart(document.getElementById('transErrorChart'), config(transErrorData));
+
+
+    // Data for each error metric
+    const focalErrorDataLLFF = {
+        labels: ['Fern', 'Flower', 'Fortress', 'Horns', 'Leaves', 'Orchids', 'Room', 'T-Rex'],
+        datasets: [
+            {label: 'NeRF--', data: [153.5, 13.2, 144.1, 156.2, 59.0, 199.3, 331.8, 89.3], backgroundColor: nerf_color},
+            {
+                label: 'SiNeRF',
+                data: [112.7, 80.4, 59.7, 282.5, 198.8, 155.7, 313.6, 38.3],
+                backgroundColor: nerf_sinerf_color
+            },
+            {label: 'OURS', data: [161.6, 53.6, 129.3, 92.5, 24.4, 165.9, 102.7, 100.4], backgroundColor: ours_color}
+        ]
+    };
+
+    const rotErrorDataLLFF = {
+        labels: ['Fern', 'Flower', 'Fortress', 'Horns', 'Leaves', 'Orchids', 'Room', 'T-Rex'],
+        datasets: [
+            {label: 'NeRF--', data: [1.78, 4.84, 1.36, 5.55, 4.36, 3.77, 2.77, 4.67], backgroundColor: nerf_color},
+            {
+                label: 'SiNeRF',
+                data: [1.17, 1.38, 2.02, 83.34, 3.97, 4.92, 4.92, 7.19],
+                backgroundColor: nerf_sinerf_color
+            },
+            {label: 'OURS', data: [1.34, 0.89, 0.91, 1.89, 2.65, 2.75, 3.27, 3.90], backgroundColor: ours_color}
+        ]
+    };
+
+    const transErrorDataLLFF = {
+        labels: ['Fern', 'Flower', 'Fortress', 'Horns', 'Leaves', 'Orchids', 'Room', 'T-Rex'],
+        datasets: [
+            {
+                label: 'NeRF--',
+                data: [0.029, 0.016, 0.025, 0.044, 0.051, 0.033, 0.033, 0.036],
+                backgroundColor: nerf_color
+            },
+            {
+                label: 'SiNeRF',
+                data: [0.006, 0.007, 0.048, 0.133, 0.014, 0.014, 0.027, 0.027],
+                backgroundColor: nerf_sinerf_color
+            },
+            {label: 'OURS', data: [0.006, 0.007, 0.006, 0.014, 0.009, 0.009, 0.007, 0.008], backgroundColor: ours_color}
+        ]
+    };
+
+
+    // Render the charts
+    new Chart(document.getElementById('focalChartLLFF'), config(focalErrorDataLLFF));
+    new Chart(document.getElementById('rotChartLLFF'), config(rotErrorDataLLFF));
+    new Chart(document.getElementById('transChartLLFF'), config(transErrorDataLLFF));
+
+</script>
 
 </body>
 </html>
